@@ -12,4 +12,8 @@ public interface AlertaAnomaliaRepository extends MongoRepository<AlertaAnomalia
     List<AlertaAnomalia> findByTramiteIdOrderByFechaDeteccionDesc(String tramiteId);
 
     List<AlertaAnomalia> findByFalsoPositivoFalseOrderByFechaDeteccionDesc();
+
+    /** Dedup de detección: ¿ya hay una alerta ABIERTA (no falso positivo) para
+     *  ese trámite + categoría? */
+    boolean existsByTramiteIdAndCategoriaAndFalsoPositivoFalse(String tramiteId, String categoria);
 }

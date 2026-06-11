@@ -65,9 +65,17 @@ public class AlertaAnomaliaService {
 
         List<AlertaAnomalia> creadas = new ArrayList<>();
         for (Map<String, Object> a : anomalias) {
+            String tramiteId = stringDe(a.get("tramite_id"));
+            String categoria = stringDe(a.get("categoria"));
+            // DEDUP: si ya hay una alerta ABIERTA para ese trámite+categoría, no
+            // crear otra. Así "Detectar" repetido sin cambios no genera duplicados.
+            if (tramiteId != null && categoria != null
+                    && alertaRepo.existsByTramiteIdAndCategoriaAndFalsoPositivoFalse(tramiteId, categoria)) {
+                continue;
+            }
             AlertaAnomalia alerta = new AlertaAnomalia();
-            alerta.setTramiteId(stringDe(a.get("tramite_id")));
-            alerta.setCategoria(stringDe(a.get("categoria")));
+            alerta.setTramiteId(tramiteId);
+            alerta.setCategoria(categoria);
             alerta.setScore(floatDe(a.get("score")));
             alerta.setDescripcion(stringDe(a.get("descripcion")));
             alerta.setFalsoPositivo(false);

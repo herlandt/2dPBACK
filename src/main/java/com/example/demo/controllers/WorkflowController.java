@@ -104,11 +104,25 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowEngine.aceptarTramite(tramiteId, auth.getName()));
     }
 
+    private boolean esFuncionario(org.springframework.security.core.Authentication auth) {
+        return auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_FUNCIONARIO".equals(a.getAuthority()));
+    }
+
     @GetMapping("/{tramiteId}/estado")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Detalle del trámite (nodo actual, progreso e historial)")
-    public ResponseEntity<Map<String, Object>> estado(@PathVariable String tramiteId) {
+    public ResponseEntity<Map<String, Object>> estado(@PathVariable String tramiteId,
+                                                       org.springframework.security.core.Authentication auth) {
         Tramite t = workflowEngine.buscarTramite(tramiteId);
+
+        // Nodo "actual" para ESTE usuario: en paralelo el funcionario tiene su propia
+        // rama (por departamento). La resolvemos para que el front gatee la edición a
+        // SU sección y no a todas las paralelas (editar una actividad a la vez).
+        String nodoActualId = t.getNodoActualId();
+        if (nodoActualId == null && esFuncionario(auth)) {
+            nodoActualId = workflowEngine.nodoActivoDeFuncionario(t, auth.getName());
+        }
 
         Map<String, Object> resp = new HashMap<>();
         resp.put("id", t.getId());
@@ -119,7 +133,7 @@ public class WorkflowController {
         resp.put("prioridad", t.getPrioridad());
         resp.put("fechaInicio", t.getFechaInicio());
         resp.put("fechaLimite", t.getFechaEstimadaCierre());
-        resp.put("nodoActualId", t.getNodoActualId());
+        resp.put("nodoActualId", nodoActualId);
         resp.put("enParalelo", t.estaEnParalelo());
         resp.put("nodosParalellosActivos", t.getNodosParalellosActivos());
         // Documento de resolución entregable (si el trámite ya lo produjo).
@@ -140,8 +154,8 @@ public class WorkflowController {
         }
 
         // Nodo actual (anidado, como espera el frontend)
-        if (t.getNodoActualId() != null) {
-            nodoRepository.findById(t.getNodoActualId()).ifPresent(nodo -> {
+        if (nodoActualId != null) {
+            nodoRepository.findById(nodoActualId).ifPresent(nodo -> {
                 resp.put("nodoActualNombre", nodo.getNombre());
                 Map<String, Object> nodoActual = new HashMap<>();
                 nodoActual.put("nodoId", nodo.getId());

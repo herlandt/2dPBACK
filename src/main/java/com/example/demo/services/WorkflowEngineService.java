@@ -593,6 +593,19 @@ public class WorkflowEngineService {
                 .orElse(null);
     }
 
+    /**
+     * Nodo activo de ESTE funcionario (en paralelo, su rama según departamento;
+     * al completarla, la siguiente). Devuelve null si no aplica (admin/cliente o
+     * sin rama propia) — para que el front gatee la edición a su sección.
+     */
+    public String nodoActivoDeFuncionario(Tramite tramite, String funcionarioId) {
+        try {
+            return resolverNodoActivo(tramite, funcionarioId);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     private String resolverNodoActivo(Tramite tramite, String funcionarioId) {
         if (tramite.estaEnParalelo()) {
             // En paralelo: priorizar el nodo cuyo departamento esté entre los del

@@ -63,6 +63,7 @@ public class ReporteNaturalService {
     @Autowired private PoliticaNegocioRepository politicaRepository;
     @Autowired private DepartamentoRepository departamentoRepository;
     @Autowired private NodoDiagramaRepository nodoRepository;
+    @Autowired private com.example.demo.repositories.TramiteRepository tramiteRepository;
 
     @Value("${app.reportes.max-filas:50000}")
     private long maxFilas;
@@ -147,7 +148,7 @@ public class ReporteNaturalService {
         List<Map<String, Object>> filas = new ArrayList<>(agg.size());
         for (Document d : agg) filas.add(new LinkedHashMap<>(d));
 
-        enriquecerNombres(filas, enriquecer);
+        resolverYHumanizar(filas);
 
         // Filtro por NOMBRE de departamento (tras enriquecer, porque es derivado).
         String deptNombre = stringDe(filtrosPost.get("departamento_nombre"));
@@ -163,31 +164,57 @@ public class ReporteNaturalService {
         return new Resultado(collection, filas, queryStr);
     }
 
-    /** Resuelve clienteId/politicaId/nodoActualId a nombres legibles, en lote. */
-    private void enriquecerNombres(List<Map<String, Object>> filas, List<String> enriquecer) {
-        if (filas.isEmpty() || enriquecer == null || enriquecer.isEmpty()) return;
+    /**
+     * Convierte cada fila a algo LEGIBLE para el usuario: resuelve SIEMPRE los IDs
+     * comunes a nombres y REEMPLAZA la columna de id por el nombre (clienteId→cliente,
+     * politicaId→politica, nodoActualId→departamento, funcionarioActualId→funcionario,
+     * tramiteId→código). Omite `_id` y los ids puramente técnicos que el usuario no
+     * entiende. (No depende de que el parser pida "enriquecer".)
+     */
+    private void resolverYHumanizar(List<Map<String, Object>> filas) {
+        if (filas.isEmpty()) return;
+        Map<String, String> clientes = mapNombres(idsDe(filas, "clienteId"), "usuario");
+        Map<String, String> politicas = mapNombres(idsDe(filas, "politicaId"), "politica");
+        Set<String> funcIds = idsDe(filas, "funcionarioActualId");
+        funcIds.addAll(idsDe(filas, "funcionarioId"));
+        Map<String, String> funcs = mapNombres(funcIds, "usuario");
+        Set<String> nodoIds = idsDe(filas, "nodoActualId");
+        nodoIds.addAll(idsDe(filas, "nodoId"));
+        Map<String, String> deptDeNodo = departamentoPorNodo(nodoIds);
+        Map<String, String> codigos = codigoPorTramite(idsDe(filas, "tramiteId"));
 
-        if (enriquecer.contains("cliente_nombre")) {
-            Map<String, String> nombres = mapNombres(idsDe(filas, "clienteId"), "usuario");
-            for (Map<String, Object> f : filas) {
-                String id = stringDe(f.get("clienteId"));
-                if (id != null) f.put("cliente", nombres.getOrDefault(id, id));
+        // ids técnicos sin valor para el usuario → se omiten de la salida
+        Set<String> tecnicos = Set.of("_id", "repositorioId", "actividadId",
+                "versionActualId", "documentoRequeridoId", "rolId", "generadoPorId",
+                "documentoResolucionId", "nodoAnteriorId", "diagramaId");
+
+        for (int i = 0; i < filas.size(); i++) {
+            Map<String, Object> f = filas.get(i);
+            Map<String, Object> out = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> e : f.entrySet()) {
+                String k = e.getKey();
+                String v = stringDe(e.getValue());
+                switch (k) {
+                    case "clienteId" -> out.put("cliente", clientes.getOrDefault(v, v));
+                    case "politicaId" -> out.put("politica", politicas.getOrDefault(v, v));
+                    case "nodoActualId", "nodoId" -> out.put("departamento", deptDeNodo.getOrDefault(v, "—"));
+                    case "funcionarioActualId", "funcionarioId" -> out.put("funcionario", funcs.getOrDefault(v, v));
+                    case "tramiteId" -> out.put("tramite", codigos.getOrDefault(v, v));
+                    default -> { if (!tecnicos.contains(k)) out.put(k, e.getValue()); }
+                }
             }
+            filas.set(i, out);
         }
-        if (enriquecer.contains("politica_nombre")) {
-            Map<String, String> nombres = mapNombres(idsDe(filas, "politicaId"), "politica");
-            for (Map<String, Object> f : filas) {
-                String id = stringDe(f.get("politicaId"));
-                if (id != null) f.put("politica", nombres.getOrDefault(id, id));
-            }
+    }
+
+    /** tramiteId → código legible (TRM-...). */
+    private Map<String, String> codigoPorTramite(Set<String> ids) {
+        Map<String, String> out = new HashMap<>();
+        if (ids.isEmpty()) return out;
+        for (com.example.demo.models.Tramite t : tramiteRepository.findAllById(ids)) {
+            out.put(t.getId(), t.getCodigo() != null ? t.getCodigo() : t.getId());
         }
-        if (enriquecer.contains("departamento_nombre")) {
-            Map<String, String> deptDeNodo = departamentoPorNodo(idsDe(filas, "nodoActualId"));
-            for (Map<String, Object> f : filas) {
-                String nodoId = stringDe(f.get("nodoActualId"));
-                if (nodoId != null) f.put("departamento", deptDeNodo.getOrDefault(nodoId, ""));
-            }
-        }
+        return out;
     }
 
     private Set<String> idsDe(List<Map<String, Object>> filas, String campo) {

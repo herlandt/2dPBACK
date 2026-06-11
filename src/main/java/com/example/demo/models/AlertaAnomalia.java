@@ -39,4 +39,8 @@ public class AlertaAnomalia {
 
     private LocalDateTime fechaDeteccion;
     private LocalDateTime fechaRevision;
+
+    /** Código legible del trámite (TRM-...), resuelto al devolver — NO se persiste. */
+    @org.springframework.data.annotation.Transient
+    private String tramiteCodigo;
 }

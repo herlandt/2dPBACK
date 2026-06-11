@@ -83,11 +83,24 @@ public class AlertaAnomaliaService {
             alerta.setFechaDeteccion(LocalDateTime.now());
             creadas.add(alertaRepo.save(alerta));
         }
+        enriquecerCodigos(creadas);
         return creadas;
     }
 
     public List<AlertaAnomalia> listarNoRevisadas() {
-        return alertaRepo.findByFalsoPositivoFalseOrderByFechaDeteccionDesc();
+        List<AlertaAnomalia> l = alertaRepo.findByFalsoPositivoFalseOrderByFechaDeteccionDesc();
+        enriquecerCodigos(l);
+        return l;
+    }
+
+    /** Resuelve el código (TRM-...) de cada anomalía a partir de su tramiteId, en lote. */
+    private void enriquecerCodigos(List<AlertaAnomalia> alertas) {
+        if (alertas.isEmpty()) return;
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (AlertaAnomalia a : alertas) if (a.getTramiteId() != null) ids.add(a.getTramiteId());
+        java.util.Map<String, String> cod = new java.util.HashMap<>();
+        tramiteRepository.findAllById(ids).forEach(t -> cod.put(t.getId(), t.getCodigo()));
+        for (AlertaAnomalia a : alertas) a.setTramiteCodigo(cod.get(a.getTramiteId()));
     }
 
     public AlertaAnomalia marcarFalsoPositivo(String id, String adminId) {

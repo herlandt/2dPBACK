@@ -79,6 +79,15 @@ public class S3StorageService {
         cli.putObject(req, RequestBody.fromInputStream(input, size));
     }
 
+    /** Descarga el objeto completo a bytes (vía SDK, endpoint regional que SÍ
+     *  rutea desde la VPC — a diferencia de la URL prefirmada global). */
+    public byte[] download(String key) {
+        S3Client cli = clienteRequerido();
+        return cli.getObjectAsBytes(
+                software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
+                        .bucket(bucket).key(key).build()).asByteArray();
+    }
+
     /** URL firmada GET con TTL configurable. */
     public URL presignedGet(String key) {
         return presignedGet(key, Duration.ofSeconds(presignedTtlSeconds));

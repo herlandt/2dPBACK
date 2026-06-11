@@ -42,4 +42,18 @@ public class OnlyOfficeController {
                                                         @RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(onlyOffice.procesarCallback(id, body));
     }
+
+    /**
+     * Contenido del documento que descarga el Document Server (server-to-server,
+     * red interna). El DS NO alcanza S3 desde la VPC; el backend se lo sirve
+     * bajándolo por SDK. Va sin auth de usuario: lo protege el token firmado.
+     */
+    @GetMapping("/{id}/onlyoffice/contenido")
+    public ResponseEntity<byte[]> contenido(@PathVariable String id,
+                                            @RequestParam String token) {
+        var c = onlyOffice.contenido(id, token);
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(c.mime()))
+                .body(c.bytes());
+    }
 }

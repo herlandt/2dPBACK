@@ -84,7 +84,14 @@ public class OnlyOfficeService {
                     "Este documento (" + fileType + ") no es un Office co-editable (docx/xlsx/pptx).");
         }
         String documentType = DOC_TYPE.get(fileType);
-        String urlOriginal = s3.presignedGet(v.getS3Key(), Duration.ofMinutes(30)).toString();
+        // El DS descarga el original del BACKEND (misma red docker), no de S3:
+        // la VPC no rutea la URL prefirmada global de S3, pero el backend sí baja
+        // de S3 por SDK (endpoint regional). Token firmado y de corta vida.
+        String dlToken = Jwts.builder().subject(documentoId)
+                .expiration(java.util.Date.from(java.time.Instant.now().plus(Duration.ofMinutes(60))))
+                .signWith(key()).compact();
+        String urlOriginal = callbackBase + "/api/documentos/" + documentoId
+                + "/onlyoffice/contenido?token=" + dlToken;
         String callbackUrl = callbackBase + "/api/documentos/" + documentoId + "/onlyoffice/callback";
         String nombreUsuario = usuarioRepo.findById(usuarioId)
                 .map(u -> (safe(u.getNombre()) + " " + safe(u.getApellido())).trim())
@@ -147,6 +154,26 @@ public class OnlyOfficeService {
         }
         return Map.of("error", 0);
     }
+
+    /** Bytes del documento para que el DS lo descargue desde el backend (no de S3). */
+    public DocContenido contenido(String documentoId, String token) {
+        io.jsonwebtoken.Claims c;
+        try {
+            c = Jwts.parser().verifyWith(key()).build().parseSignedClaims(token).getPayload();
+        } catch (Exception e) {
+            throw new SecurityException("Token de descarga inválido o expirado.");
+        }
+        if (!documentoId.equals(c.getSubject())) {
+            throw new SecurityException("El token no corresponde a este documento.");
+        }
+        DocumentoArchivo doc = docRepo.findById(documentoId)
+                .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado"));
+        VersionDocumento v = versionRepo.findById(doc.getVersionActualId())
+                .orElseThrow(() -> new IllegalStateException("Documento sin versión actual"));
+        return new DocContenido(s3.download(v.getS3Key()), mimeDeExt(ext(v.getS3Key())));
+    }
+
+    public record DocContenido(byte[] bytes, String mime) {}
 
     private void verificarToken(Map<String, Object> body) {
         if (!conJwt()) return;

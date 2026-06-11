@@ -71,7 +71,8 @@ public class OnlyOfficeService {
 
     // ── Config del editor ────────────────────────────────────────────────────
 
-    public Map<String, Object> construirConfig(String documentoId, String usuarioId) {
+    public Map<String, Object> construirConfig(String documentoId, String usuarioId, String modo) {
+        boolean editar = !"view".equalsIgnoreCase(modo);
         if (!enabled) throw new IllegalStateException("OnlyOffice no está habilitado en el servidor.");
         DocumentoArchivo doc = docRepo.findById(documentoId)
                 .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado: " + documentoId));
@@ -104,10 +105,10 @@ public class OnlyOfficeService {
         document.put("key", doc.getVersionActualId());
         document.put("title", tituloConExt(doc.getNombreLogico(), fileType));
         document.put("url", urlOriginal);
-        document.put("permissions", Map.of("edit", true, "download", true));
+        document.put("permissions", Map.of("edit", editar, "download", true));
 
         Map<String, Object> editorConfig = new LinkedHashMap<>();
-        editorConfig.put("mode", "edit");
+        editorConfig.put("mode", editar ? "edit" : "view");
         editorConfig.put("lang", "es");
         editorConfig.put("callbackUrl", callbackUrl);
         editorConfig.put("user", Map.of("id", usuarioId, "name", nombreUsuario));

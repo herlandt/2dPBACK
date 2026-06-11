@@ -25,10 +25,13 @@ public class OnlyOfficeController {
     @GetMapping("/{id}/onlyoffice/config")
     @PreAuthorize("hasAnyRole('FUNCIONARIO','ADMINISTRADOR')")
     @Operation(summary = "Config del editor OnlyOffice para co-editar un documento Office")
-    public ResponseEntity<Map<String, Object>> config(@PathVariable String id, Authentication auth) {
+    public ResponseEntity<Map<String, Object>> config(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "edit") String mode,
+            Authentication auth) {
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("serverUrl", onlyOffice.serverUrl());
-        resp.put("config", onlyOffice.construirConfig(id, auth.getName()));
+        resp.put("config", onlyOffice.construirConfig(id, auth.getName(), mode));
         return ResponseEntity.ok(resp);
     }
 

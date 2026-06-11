@@ -13,7 +13,8 @@ public interface AlertaAnomaliaRepository extends MongoRepository<AlertaAnomalia
 
     List<AlertaAnomalia> findByFalsoPositivoFalseOrderByFechaDeteccionDesc();
 
-    /** Dedup de detección: ¿ya hay una alerta ABIERTA (no falso positivo) para
-     *  ese trámite + categoría? */
-    boolean existsByTramiteIdAndCategoriaAndFalsoPositivoFalse(String tramiteId, String categoria);
+    /** Dedup de detección: ¿ya hay CUALQUIER alerta (abierta o ya marcada falso
+     *  positivo) para ese trámite + categoría? Incluir las falso-positivo evita
+     *  re-detectar lo que el admin ya descartó. */
+    boolean existsByTramiteIdAndCategoria(String tramiteId, String categoria);
 }

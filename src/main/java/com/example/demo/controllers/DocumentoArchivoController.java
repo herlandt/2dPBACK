@@ -30,6 +30,7 @@ public class DocumentoArchivoController {
 
     @Autowired private DocumentoArchivoService docService;
     @Autowired private VersionadoService versionadoService;
+    @Autowired private com.example.demo.services.BlankOfficeTemplates blankTemplates;
 
     // ── CU-33 · Subir documento ──────────────────────────────────────────────
 
@@ -58,6 +59,26 @@ public class DocumentoArchivoController {
                 auth.getName(), rolDe(auth),
                 ipDe(request), request.getHeader("User-Agent"));
 
+        return ResponseEntity.status(HttpStatus.CREATED).body(resp);
+    }
+
+    /** Crea un documento Office EN BLANCO (Word/Excel) en el repo del trámite,
+     *  listo para co-editar con OnlyOffice. Reutiliza el flujo de subida normal. */
+    @PostMapping("/tramites/{tramiteId}/documentos/blank")
+    @PreAuthorize("hasAnyRole('FUNCIONARIO','ADMINISTRADOR')")
+    @Operation(summary = "Crear un documento Office en blanco (Word/Excel) en el trámite")
+    public ResponseEntity<DocumentoArchivoResponse> crearEnBlanco(
+            @PathVariable String tramiteId,
+            @RequestBody com.example.demo.dto.CrearDocumentoBlancoRequest req,
+            Authentication auth,
+            HttpServletRequest request) {
+
+        MultipartFile archivo = blankTemplates.plantilla(req.getTipo(), req.getNombreLogico());
+        DocumentoArchivoResponse resp = docService.subirPorTramite(
+                tramiteId, req.getActividadId(), null, null, req.getNodoId(),
+                blankTemplates.tipoCatalogo(req.getTipo()), req.getNombreLogico(), false,
+                archivo,
+                auth.getName(), rolDe(auth), ipDe(request), request.getHeader("User-Agent"));
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }
 

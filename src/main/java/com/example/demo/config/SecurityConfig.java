@@ -149,6 +149,8 @@ public class SecurityConfig {
                 // Repositorio 1:1 al trámite — lectura para cualquier autenticado
                 .requestMatchers(HttpMethod.GET,  "/api/repositorios/**").authenticated()
                 .requestMatchers(HttpMethod.GET,  "/api/tramites/*/repositorio").authenticated()
+                // Crear documento Office en blanco — solo funcionario/admin (antes del comodín)
+                .requestMatchers(HttpMethod.POST, "/api/tramites/*/documentos/blank").hasAnyRole("FUNCIONARIO", "ADMINISTRADOR")
                 // Subir documento al trámite — funcionario/admin/cliente
                 .requestMatchers(HttpMethod.POST, "/api/tramites/*/documentos").hasAnyRole("FUNCIONARIO", "ADMINISTRADOR", "CLIENTE")
                 // Versionar — solo funcionario/admin
